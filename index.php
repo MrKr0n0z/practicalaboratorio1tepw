@@ -59,10 +59,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         const model = new SakilaModel();
         const view = new SakilaView();
-        const controller = new SakilaController(model, view);
-        
+        appController = new SakilaController(model, view);
+
         // Verificar conexión e inicializar
-        await controller.checkAndInitialize();
+        await appController.checkAndInitialize();
     } catch (error) {
         console.error('Error inicializando la aplicación:', error);
         alert('Error al cargar la aplicación. Por favor, recarga la página.');
