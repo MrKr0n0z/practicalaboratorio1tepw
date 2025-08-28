@@ -1,5 +1,5 @@
 // =========================
-// CONTROLADOR (Controller)
+// CONTROLADOR (Controller) - CORREGIDO
 // =========================
 class SakilaController {
     constructor(model, view) {
@@ -19,10 +19,10 @@ class SakilaController {
         this.init();
     }
 
-    init() {
+    async init() {
         this.view.init();
         this.setupInitialView();
-        this.switchTable('peliculas'); // Tabla por defecto
+        await this.switchTable('peliculas'); // Tabla por defecto
     }
 
     setupInitialView() {
@@ -32,9 +32,9 @@ class SakilaController {
     }
 
     // Observer method - se ejecuta cuando el modelo cambia
-    dataChanged(data) {
+    async dataChanged(data) {
         // Recargar datos cuando hay cambios
-        this.loadTableData();
+        await this.loadTableData();
         this.view.resetSelection();
         
         let message = '';
@@ -55,10 +55,10 @@ class SakilaController {
         this.view.showMessage(message, 'success');
     }
 
-    switchTable(tableName) {
+    async switchTable(tableName) {
         try {
             this.view.switchTable(tableName);
-            this.loadTableData();
+            await this.loadTableData();
             this.view.updateButtons();
         } catch (error) {
             console.error('Error switching table:', error);
@@ -66,15 +66,33 @@ class SakilaController {
         }
     }
 
-    loadTableData() {
+    async loadTableData() {
         try {
-            const data = this.model.getAll(this.view.getCurrentTable());
+            // IMPORTANTE: Usar await para esperar la Promise
+            const data = await this.model.getAll(this.view.getCurrentTable());
             this.view.setFilteredData([...data]);
             this.view.renderTable(this.view.getFilteredData());
             this.view.renderPagination(this.view.getFilteredData().length);
         } catch (error) {
             console.error('Error loading table data:', error);
-            this.view.showMessage('Error al cargar los datos.', 'error');
+            this.view.showMessage('Error al cargar los datos. Verificando conexión...', 'error');
+            
+            // Si falla, intentar modo offline
+            const isConnected = await this.model.checkConnection();
+            if (!isConnected) {
+                console.log('No hay conexión con el servidor. Usando datos de ejemplo.');
+                this.model.useOfflineMode();
+                // Intentar cargar de nuevo con datos offline
+                try {
+                    const offlineData = await this.model.getAll(this.view.getCurrentTable());
+                    this.view.setFilteredData([...offlineData]);
+                    this.view.renderTable(this.view.getFilteredData());
+                    this.view.renderPagination(this.view.getFilteredData().length);
+                    this.view.showMessage('Usando modo offline con datos de ejemplo.', 'warning');
+                } catch (offlineError) {
+                    console.error('Error en modo offline:', offlineError);
+                }
+            }
         }
     }
 
@@ -97,16 +115,18 @@ class SakilaController {
         }
     }
 
-    searchTable(event) {
+    async searchTable(event) {
         try {
             const searchTerm = event.target.value.toLowerCase();
             const currentTable = this.view.getCurrentTable();
             
             let filteredData;
             if (!searchTerm) {
-                filteredData = this.model.getAll(currentTable);
+                // Usar await para la operación asíncrona
+                filteredData = await this.model.getAll(currentTable);
             } else {
-                filteredData = this.model.search(currentTable, searchTerm);
+                // Usar await para la operación asíncrona
+                filteredData = await this.model.search(currentTable, searchTerm);
             }
             
             this.view.setFilteredData(filteredData);
@@ -156,7 +176,7 @@ class SakilaController {
         }
     }
 
-    deleteSelected() {
+    async deleteSelected() {
         try {
             const selectedRow = this.view.getSelectedRow();
             if (selectedRow === null) {
@@ -173,7 +193,8 @@ class SakilaController {
             const itemName = item.nombre || item.titulo || `ID ${item.id}`;
             
             if (confirm(`¿Estás seguro de que deseas eliminar "${itemName}"?`)) {
-                this.model.delete(this.view.getCurrentTable(), item.id);
+                // Usar await para la operación asíncrona
+                await this.model.delete(this.view.getCurrentTable(), item.id);
             }
         } catch (error) {
             console.error('Error deleting selected:', error);
@@ -181,7 +202,7 @@ class SakilaController {
         }
     }
 
-    handleFormSubmit(event) {
+    async handleFormSubmit(event) {
         try {
             const form = event.target;
             const mode = form.dataset.mode;
@@ -205,17 +226,18 @@ class SakilaController {
                 }
             });
             
+            // Usar await para las operaciones asíncronas
             if (mode === 'add') {
-                this.model.create(table, data);
+                await this.model.createWithValidation(table, data);
             } else if (mode === 'edit') {
                 const id = parseInt(form.dataset.id);
-                this.model.update(table, id, data);
+                await this.model.updateWithValidation(table, id, data);
             }
             
             this.closeModal();
         } catch (error) {
             console.error('Error al procesar el formulario:', error);
-            this.view.showMessage('Error al procesar la solicitud.', 'error');
+            this.view.showMessage(error.message || 'Error al procesar la solicitud.', 'error');
         }
     }
 
@@ -224,6 +246,35 @@ class SakilaController {
             this.view.closeModal();
         } catch (error) {
             console.error('Error closing modal:', error);
+        }
+    }
+
+    // Método adicional para verificar conexión al inicio
+    async checkAndInitialize() {
+        try {
+            const isConnected = await this.model.checkConnection();
+            if (!isConnected) {
+                console.warn('No hay conexión con el servidor.');
+                this.view.showMessage('No se puede conectar con el servidor. Intentando modo offline...', 'warning');
+                
+                // Intentar detectar automáticamente la URL correcta
+                const detected = await this.model.autoDetectApiUrl();
+                if (detected) {
+                    this.view.showMessage('Conexión establecida.', 'success');
+                    await this.loadTableData();
+                } else {
+                    // Usar modo offline si no se puede conectar
+                    this.model.useOfflineMode();
+                    this.view.showMessage('Usando modo offline con datos de ejemplo.', 'info');
+                    await this.loadTableData();
+                }
+            } else {
+                await this.loadTableData();
+            }
+        } catch (error) {
+            console.error('Error durante la inicialización:', error);
+            this.model.useOfflineMode();
+            await this.loadTableData();
         }
     }
 }
