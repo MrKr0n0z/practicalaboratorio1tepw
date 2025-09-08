@@ -5,6 +5,9 @@ header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 header("Content-Type: application/json");
 
+//api sin meter patron de diseño
+
+
 // Manejar preflight OPTIONS request
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -49,6 +52,7 @@ $tableMapping = [
 ];
 
 // Obtener tabla y acción de la URL
+
 $apiIndex = array_search('api.php', $pathParts);
 $table = isset($pathParts[$apiIndex + 1]) ? $pathParts[$apiIndex + 1] : '';
 $id = isset($pathParts[$apiIndex + 2]) ? $pathParts[$apiIndex + 2] : '';
