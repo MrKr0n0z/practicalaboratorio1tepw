@@ -1,5 +1,5 @@
 // =========================
-// CONTROLADOR (Controller) - CORREGIDO
+// CONTROLADOR (Controller)
 // =========================
 class SakilaController {
     constructor(model, view) {
